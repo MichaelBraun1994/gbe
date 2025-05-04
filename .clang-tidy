@@ -1,0 +1,9 @@
+Checks: 'cert-*,cppcoreguidelines-*,bugprone-*,readability-*,modernize-*,-modernize-use-trailing-return-type'
+WarningsAsErrors: '*'
+CheckOptions:
+    - key: readability-macro-usage.IgnoreMacros
+        value: true
+    - key: cppcoreguidelines-avoid-magic-numbers.IgnoreAllMagicNumbers
+        value: true
+HeaderFilterRegex: '.'
+FormatStyle: google

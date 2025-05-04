@@ -5,4 +5,5 @@ target_link_libraries(gbe
     PRIVATE
     SDL3::SDL3
     imgui
+    plog
 )
