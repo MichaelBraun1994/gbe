@@ -3,7 +3,7 @@ IndentWidth: 2
 ColumnLimit: 120
 UseTab: Never
 BreakBeforeBraces: Allman
-AllowShortFunctionsOnASingleLine: None
+AllowShortFunctionsOnASingleLine: InlineOnly
 PointerAlignment: Left
 ReferenceAlignment: Left
 SpaceBeforeParens: ControlStatements
