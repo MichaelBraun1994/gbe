@@ -1,7 +1,7 @@
-#include "renderer.hpp"
+#include "ppu.hpp"
 #include <stdexcept>
 
-Renderer::Renderer(int width, int height) : width(width), height(height), framebuffer(width * height)
+PPU::PPU(int width, int height) : width(width), height(height), framebuffer(width * height)
 {
   if (!SDL_Init(SDL_INIT_VIDEO))
   {
@@ -21,7 +21,7 @@ Renderer::Renderer(int width, int height) : width(width), height(height), frameb
     throw std::runtime_error(SDL_GetError());
 }
 
-Renderer::~Renderer()
+PPU::~PPU()
 {
   SDL_DestroyTexture(texture);
   SDL_DestroyRenderer(renderer);
@@ -29,13 +29,13 @@ Renderer::~Renderer()
   SDL_Quit();
 }
 
-void Renderer::SetPixel(int x, int y, uint32_t color)
+void PPU::SetPixel(int x, int y, uint32_t color)
 {
   if (x >= 0 && x < width && y >= 0 && y < height)
     framebuffer[y * width + x] = color;
 }
 
-void Renderer::Update()
+void PPU::Update()
 {
   SDL_UpdateTexture(texture, nullptr, framebuffer.data(), width * sizeof(uint32_t));
   SDL_RenderClear(renderer);
@@ -43,7 +43,7 @@ void Renderer::Update()
   SDL_RenderPresent(renderer);
 }
 
-void Renderer::Clear(uint32_t color)
+void PPU::Clear(uint32_t color)
 {
   std::fill(framebuffer.begin(), framebuffer.end(), color);
 }

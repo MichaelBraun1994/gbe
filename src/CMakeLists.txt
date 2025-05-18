@@ -4,7 +4,8 @@ add_executable(gbe
     main.cpp
     gameboy.cpp
     logger.cpp
-    renderer.cpp
+    ppu.cpp
+    mmu.cpp
     controls.cpp
     cpu/cpu.cpp
 )

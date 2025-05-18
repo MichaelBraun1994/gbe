@@ -1,0 +1,1 @@
+﻿2025-05-18 21:53:19.011 INFO  [100344] [main@12] Starting application.
