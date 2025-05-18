@@ -57,6 +57,11 @@ void GameBoy::TurnOn()
     HandleInputs();
 
     cpu->Tick();
+    if (cpu->isHalted())
+    {
+      TurnOff();
+    }
+
     ppu->Update();
 
     SDL_Delay(1);

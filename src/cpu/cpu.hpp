@@ -21,11 +21,23 @@ struct Flags
 
 class CPU
 {
+  MMU& mmu;
+
   Registers registers;
   Flags flags;
-  MMU& mmu;
+
+  std::uint16_t sp{0};
+  std::uint16_t pc{0};
+
+  bool halted = false;
+
+  void executeOPCode(std::uint8_t opcode);
+
+  void halt();
 
 public:
   CPU(MMU& mmu) : mmu(mmu) {}
   void Tick();
+
+  bool isHalted() { return halted; }
 };

@@ -14,6 +14,11 @@ void MMU::AssertAddress(Address address)
   }
 }
 
+MMU::MMU()
+{
+  std::fill(memmory.begin(), memmory.end(), 0xFF);
+}
+
 void MMU::LoadROM(const std::string& filePath)
 {
   std::filesystem::path path{filePath};
@@ -32,7 +37,7 @@ void MMU::LoadROM(const std::string& filePath)
   std::streamsize fileSize = romFile.tellg();
   romFile.seekg(0, std::iostream::beg);
 
-  if (!romFile.read(reinterpret_cast<char*>(memmory), fileSize))
+  if (!romFile.read(reinterpret_cast<char*>(memmory.data()), fileSize))
   {
     throw std::runtime_error{"Unable to read ROM."};
   }
