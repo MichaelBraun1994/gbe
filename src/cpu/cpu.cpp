@@ -301,6 +301,23 @@ void CPU::SWAP_R8(std::uint8_t& reg)
   registers.SetZeroFlag(reg == 0);
 }
 
+void CPU::BIT_R8(std::uint8_t& reg, int bitNumber)
+{
+  registers.SetSubtractionFlag(false);
+  registers.SetHalfCarryFlag(true);
+  registers.SetZeroFlag((reg & (1 << bitNumber)) == 0);
+}
+
+void CPU::RES_R8(std::uint8_t& reg, int bitNumber)
+{
+  reg &= ~(1 << bitNumber);
+}
+
+void CPU::SET_R8(std::uint8_t& reg, int bitNumber)
+{
+  reg |= (1 << bitNumber);
+}
+
 void CPU::PUSH_N16(const std::uint16_t& value)
 {
   --registers.SP;
@@ -550,12 +567,17 @@ void CPU::INC_E()
   INC_R8(registers.E);
 }
 
+void CPU::DEC_E()
+{
+  DEC_R8(registers.E);
+}
+
 void CPU::LD_E_N8()
 {
   registers.E = GetN8();
 }
 
-void CPU::RAA()
+void CPU::RRA()
 {
   registers.SetZeroFlag(false);
   registers.SetSubtractionFlag(false);
@@ -2384,32 +2406,32 @@ void CPU::BIT_7_A()
 
 void CPU::RES_0_B()
 {
-  BIT_R8(registers.B, 0);
+  RES_R8(registers.B, 0);
 }
 
 void CPU::RES_0_C()
 {
-  BIT_R8(registers.C, 0);
+  RES_R8(registers.C, 0);
 }
 
 void CPU::RES_0_D()
 {
-  BIT_R8(registers.D, 0);
+  RES_R8(registers.D, 0);
 }
 
 void CPU::RES_0_E()
 {
-  BIT_R8(registers.E, 0);
+  RES_R8(registers.E, 0);
 }
 
 void CPU::RES_0_H()
 {
-  BIT_R8(registers.H, 0);
+  RES_R8(registers.H, 0);
 }
 
 void CPU::RES_0_L()
 {
-  BIT_R8(registers.H, 0);
+  RES_R8(registers.H, 0);
 }
 
 void CPU::RES_0_dHL()
@@ -2421,30 +2443,37 @@ void CPU::RES_0_dHL()
 
 void CPU::RES_0_A()
 {
+  RES_R8(registers.A, 0);
 }
 
 void CPU::RES_1_B()
 {
+  RES_R8(registers.B, 1);
 }
 
 void CPU::RES_1_C()
 {
+  RES_R8(registers.C, 1);
 }
 
 void CPU::RES_1_D()
 {
+  RES_R8(registers.D, 1);
 }
 
 void CPU::RES_1_E()
 {
+  RES_R8(registers.E, 1);
 }
 
 void CPU::RES_1_H()
 {
+  RES_R8(registers.H, 1);
 }
 
 void CPU::RES_1_L()
 {
+  RES_R8(registers.L, 1);
 }
 
 void CPU::RES_1_dHL()
@@ -2456,30 +2485,37 @@ void CPU::RES_1_dHL()
 
 void CPU::RES_1_A()
 {
+  RES_R8(registers.A, 1);
 }
 
 void CPU::RES_2_B()
 {
+  RES_R8(registers.B, 2);
 }
 
 void CPU::RES_2_C()
 {
+  RES_R8(registers.C, 2);
 }
 
 void CPU::RES_2_D()
 {
+  RES_R8(registers.D, 2);
 }
 
 void CPU::RES_2_E()
 {
+  RES_R8(registers.E, 2);
 }
 
 void CPU::RES_2_H()
 {
+  RES_R8(registers.H, 2);
 }
 
 void CPU::RES_2_L()
 {
+  RES_R8(registers.L, 2);
 }
 
 void CPU::RES_2_dHL()
@@ -2491,30 +2527,37 @@ void CPU::RES_2_dHL()
 
 void CPU::RES_2_A()
 {
+  RES_R8(registers.A, 2);
 }
 
 void CPU::RES_3_B()
 {
+  RES_R8(registers.B, 3);
 }
 
 void CPU::RES_3_C()
 {
+  RES_R8(registers.C, 3);
 }
 
 void CPU::RES_3_D()
 {
+  RES_R8(registers.D, 3);
 }
 
 void CPU::RES_3_E()
 {
+  RES_R8(registers.E, 3);
 }
 
 void CPU::RES_3_H()
 {
+  RES_R8(registers.H, 3);
 }
 
 void CPU::RES_3_L()
 {
+  RES_R8(registers.L, 3);
 }
 
 void CPU::RES_3_dHL()
@@ -2526,26 +2569,32 @@ void CPU::RES_3_dHL()
 
 void CPU::RES_3_A()
 {
+  RES_R8(registers.A, 3);
 }
 
 void CPU::RES_4_B()
 {
+  RES_R8(registers.B, 4);
 }
 
 void CPU::RES_4_C()
 {
+  RES_R8(registers.C, 4);
 }
 
 void CPU::RES_4_E()
 {
+  RES_R8(registers.E, 4);
 }
 
 void CPU::RES_4_H()
 {
+  RES_R8(registers.H, 4);
 }
 
 void CPU::RES_4_L()
 {
+  RES_R8(registers.L, 4);
 }
 
 void CPU::RES_4_dHL()
@@ -2557,30 +2606,37 @@ void CPU::RES_4_dHL()
 
 void CPU::RES_4_A()
 {
+  RES_R8(registers.A, 4);
 }
 
 void CPU::RES_5_B()
 {
+  RES_R8(registers.B, 5);
 }
 
 void CPU::RES_5_C()
 {
+  RES_R8(registers.C, 5);
 }
 
 void CPU::RES_5_D()
 {
+  RES_R8(registers.D, 5);
 }
 
 void CPU::RES_5_E()
 {
+  RES_R8(registers.E, 5);
 }
 
 void CPU::RES_5_H()
 {
+  RES_R8(registers.H, 5);
 }
 
 void CPU::RES_5_L()
 {
+  RES_R8(registers.L, 5);
 }
 
 void CPU::RES_5_dHL()
@@ -2592,30 +2648,37 @@ void CPU::RES_5_dHL()
 
 void CPU::RES_5_A()
 {
+  RES_R8(registers.A, 5);
 }
 
 void CPU::RES_6_B()
 {
+  RES_R8(registers.B, 6);
 }
 
 void CPU::RES_6_C()
 {
+  RES_R8(registers.C, 6);
 }
 
 void CPU::RES_6_D()
 {
+  RES_R8(registers.D, 6);
 }
 
 void CPU::RES_6_E()
 {
+  RES_R8(registers.E, 6);
 }
 
 void CPU::RES_6_H()
 {
+  RES_R8(registers.H, 6);
 }
 
 void CPU::RES_6_L()
 {
+  RES_R8(registers.L, 6);
 }
 
 void CPU::RES_6_dHL()
@@ -2627,30 +2690,37 @@ void CPU::RES_6_dHL()
 
 void CPU::RES_6_A()
 {
+  RES_R8(registers.A, 6);
 }
 
 void CPU::RES_7_B()
 {
+  RES_R8(registers.B, 7);
 }
 
 void CPU::RES_7_C()
 {
+  RES_R8(registers.C, 7);
 }
 
 void CPU::RES_7_D()
 {
+  RES_R8(registers.D, 7);
 }
 
 void CPU::RES_7_E()
 {
+  RES_R8(registers.E, 7);
 }
 
 void CPU::RES_7_H()
 {
+  RES_R8(registers.H, 7);
 }
 
 void CPU::RES_7_L()
 {
+  RES_R8(registers.L, 7);
 }
 
 void CPU::RES_7_dHL()
@@ -2662,30 +2732,37 @@ void CPU::RES_7_dHL()
 
 void CPU::RES_7_A()
 {
+  RES_R8(registers.A, 7);
 }
 
 void CPU::SET_0_B()
 {
+  SET_R8(registers.B, 0);
 }
 
 void CPU::SET_0_C()
 {
+  SET_R8(registers.C, 0);
 }
 
 void CPU::SET_0_D()
 {
+  SET_R8(registers.D, 0);
 }
 
 void CPU::SET_0_E()
 {
+  SET_R8(registers.E, 0);
 }
 
 void CPU::SET_0_H()
 {
+  SET_R8(registers.H, 0);
 }
 
 void CPU::SET_0_L()
 {
+  SET_R8(registers.L, 0);
 }
 
 void CPU::SET_0_dHL()
@@ -2697,30 +2774,37 @@ void CPU::SET_0_dHL()
 
 void CPU::SET_0_A()
 {
+  SET_R8(registers.A, 0);
 }
 
 void CPU::SET_1_B()
 {
+  SET_R8(registers.B, 1);
 }
 
 void CPU::SET_1_C()
 {
+  SET_R8(registers.C, 1);
 }
 
 void CPU::SET_1_D()
 {
+  SET_R8(registers.D, 1);
 }
 
 void CPU::SET_1_E()
 {
+  SET_R8(registers.E, 1);
 }
 
 void CPU::SET_1_H()
 {
+  SET_R8(registers.H, 1);
 }
 
 void CPU::SET_1_L()
 {
+  SET_R8(registers.L, 1);
 }
 
 void CPU::SET_1_dHL()
@@ -2732,30 +2816,37 @@ void CPU::SET_1_dHL()
 
 void CPU::SET_1_A()
 {
+  SET_R8(registers.A, 1);
 }
 
 void CPU::SET_2_B()
 {
+  SET_R8(registers.B, 2);
 }
 
 void CPU::SET_2_C()
 {
+  SET_R8(registers.C, 2);
 }
 
 void CPU::SET_2_D()
 {
+  SET_R8(registers.D, 2);
 }
 
 void CPU::SET_2_E()
 {
+  SET_R8(registers.E, 2);
 }
 
 void CPU::SET_2_H()
 {
+  SET_R8(registers.H, 2);
 }
 
 void CPU::SET_2_L()
 {
+  SET_R8(registers.L, 2);
 }
 
 void CPU::SET_2_dHL()
@@ -2767,30 +2858,37 @@ void CPU::SET_2_dHL()
 
 void CPU::SET_2_A()
 {
+  SET_R8(registers.A, 2);
 }
 
 void CPU::SET_3_B()
 {
+  SET_R8(registers.B, 3);
 }
 
 void CPU::SET_3_C()
 {
+  SET_R8(registers.C, 3);
 }
 
 void CPU::SET_3_D()
 {
+  SET_R8(registers.D, 3);
 }
 
 void CPU::SET_3_E()
 {
+  SET_R8(registers.E, 3);
 }
 
 void CPU::SET_3_H()
 {
+  SET_R8(registers.H, 3);
 }
 
 void CPU::SET_3_L()
 {
+  SET_R8(registers.L, 3);
 }
 
 void CPU::SET_3_dHL()
@@ -2802,30 +2900,37 @@ void CPU::SET_3_dHL()
 
 void CPU::SET_3_A()
 {
+  SET_R8(registers.A, 3);
 }
 
 void CPU::SET_4_B()
 {
+  SET_R8(registers.B, 4);
 }
 
 void CPU::SET_4_C()
 {
+  SET_R8(registers.C, 4);
 }
 
 void CPU::SET_4_D()
 {
+  SET_R8(registers.D, 4);
 }
 
 void CPU::SET_4_E()
 {
+  SET_R8(registers.E, 4);
 }
 
 void CPU::SET_4_H()
 {
+  SET_R8(registers.H, 4);
 }
 
 void CPU::SET_4_L()
 {
+  SET_R8(registers.L, 4);
 }
 
 void CPU::SET_4_dHL()
@@ -2837,30 +2942,37 @@ void CPU::SET_4_dHL()
 
 void CPU::SET_4_A()
 {
+  SET_R8(registers.A, 4);
 }
 
 void CPU::SET_5_B()
 {
+  SET_R8(registers.B, 5);
 }
 
 void CPU::SET_5_C()
 {
+  SET_R8(registers.C, 5);
 }
 
 void CPU::SET_5_D()
 {
+  SET_R8(registers.D, 5);
 }
 
 void CPU::SET_5_E()
 {
+  SET_R8(registers.E, 5);
 }
 
 void CPU::SET_5_H()
 {
+  SET_R8(registers.H, 5);
 }
 
 void CPU::SET_5_L()
 {
+  SET_R8(registers.L, 5);
 }
 
 void CPU::SET_5_dHL()
@@ -2872,30 +2984,37 @@ void CPU::SET_5_dHL()
 
 void CPU::SET_5_A()
 {
+  SET_R8(registers.A, 5);
 }
 
 void CPU::SET_6_B()
 {
+  SET_R8(registers.B, 6);
 }
 
 void CPU::SET_6_C()
 {
+  SET_R8(registers.C, 6);
 }
 
 void CPU::SET_6_D()
 {
+  SET_R8(registers.D, 6);
 }
 
 void CPU::SET_6_E()
 {
+  SET_R8(registers.E, 6);
 }
 
 void CPU::SET_6_H()
 {
+  SET_R8(registers.H, 6);
 }
 
 void CPU::SET_6_L()
 {
+  SET_R8(registers.L, 6);
 }
 
 void CPU::SET_6_dHL()
@@ -2907,30 +3026,37 @@ void CPU::SET_6_dHL()
 
 void CPU::SET_6_A()
 {
+  SET_R8(registers.A, 6);
 }
 
 void CPU::SET_7_B()
 {
+  SET_R8(registers.B, 7);
 }
 
 void CPU::SET_7_C()
 {
+  SET_R8(registers.C, 7);
 }
 
 void CPU::SET_7_D()
 {
+  SET_R8(registers.D, 7);
 }
 
 void CPU::SET_7_E()
 {
+  SET_R8(registers.E, 7);
 }
 
 void CPU::SET_7_H()
 {
+  SET_R8(registers.H, 7);
 }
 
 void CPU::SET_7_L()
 {
+  SET_R8(registers.L, 7);
 }
 
 void CPU::SET_7_dHL()
@@ -2942,4 +3068,5 @@ void CPU::SET_7_dHL()
 
 void CPU::SET_7_A()
 {
+  SET_R8(registers.A, 7);
 }

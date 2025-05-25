@@ -109,6 +109,9 @@ class CPU
   void RRC_R8(std::uint8_t& reg);
 
   void SWAP_R8(std::uint8_t& reg);
+  void BIT_R8(std::uint8_t& reg, int bitNumber);
+  void RES_R8(std::uint8_t& reg, int bitNumber);
+  void SET_R8(std::uint8_t& reg, int bitNumber);
 
   void PUSH_N16(const std::uint16_t& value);
   std::uint16_t POP_N16();
@@ -130,8 +133,6 @@ class CPU
   bool IsCarryUnderflow8(const std::uint8_t a, const std::uint8_t b);
 
   // opcodes
-  using OpcodeFunction = void (CPU::*)();
-
   void NOP();
   void LD_BC_N16();
   void LD_dBC_A();
@@ -162,8 +163,9 @@ class CPU
   void LD_A_dDE();
   void DEC_DE();
   void INC_E();
+  void DEC_E();
   void LD_E_N8();
-  void RAA();
+  void RRA();
 
   void JR_NZ_E8();
   void LD_HL_N16();
@@ -649,7 +651,98 @@ class CPU
   void SET_7_dHL();
   void SET_7_A();
 
-  std::array<OpcodeFunction, 256> opcode = {&CPU::NOP};
+  using OpcodeFunction = void (CPU::*)();
+  static constexpr std::uint8_t ExtendedOpcodePrefix = 0xCB;
+
+  std::array<OpcodeFunction, 256> opcodeTable = {
+      &CPU::NOP,        &CPU::LD_BC_N16, &CPU::LD_dBC_A,      &CPU::INC_BC,    &CPU::INC_B,       &CPU::DEC_B,
+      &CPU::LD_B_N8,    &CPU::RLCA,      &CPU::LD_DN16_SP,    &CPU::ADD_HL_BC, &CPU::LD_A_DBC,    &CPU::DEC_BC,
+      &CPU::INC_C,      &CPU::DEC_C,     &CPU::LD_C_N8,       &CPU::RRCA,      &CPU::STOP_N8,     &CPU::LD_DE_N16,
+      &CPU::LD_dDE_A,   &CPU::INC_DE,    &CPU::INC_D,         &CPU::DEC_D,     &CPU::LD_D_N8,     &CPU::RLA,
+      &CPU::JR_E8,      &CPU::ADD_HL_DE, &CPU::LD_A_dDE,      &CPU::DEC_DE,    &CPU::INC_E,       &CPU::DEC_E,
+      &CPU::LD_E_N8,    &CPU::RRA,       &CPU::JR_NZ_E8,      &CPU::LD_HL_N16, &CPU::LD_dHLi_A,   &CPU::INC_HL,
+      &CPU::INC_H,      &CPU::DEC_H,     &CPU::LD_H_N8,       &CPU::DAA,       &CPU::JR_Z_E8,     &CPU::ADD_HL_HL,
+      &CPU::LD_A_dHLi,  &CPU::DEC_HL,    &CPU::INC_L,         &CPU::DEC_L,     &CPU::LD_L_N8,     &CPU::CPL,
+      &CPU::JR_NC_E8,   &CPU::LD_SP_N16, &CPU::LD_dHLd_A,     &CPU::INC_SP,    &CPU::INC_dHL,     &CPU::DEC_dHL,
+      &CPU::LD_dHL_N8,  &CPU::SCF,       &CPU::JR_C_E8,       &CPU::ADD_HL_SP, &CPU::LD_A_dHLd,   &CPU::DEC_SP,
+      &CPU::INC_A,      &CPU::DEC_A,     &CPU::LD_A_N8,       &CPU::CCF,       &CPU::LD_B_B,      &CPU::LD_B_C,
+      &CPU::LD_B_D,     &CPU::LD_B_E,    &CPU::LD_B_H,        &CPU::LD_B_L,    &CPU::LD_B_dHL,    &CPU::LD_B_A,
+      &CPU::LD_C_B,     &CPU::LD_C_C,    &CPU::LD_C_D,        &CPU::LD_C_E,    &CPU::LD_C_H,      &CPU::LD_C_L,
+      &CPU::LD_C_dHL,   &CPU::LD_C_A,    &CPU::LD_D_B,        &CPU::LD_D_C,    &CPU::LD_D_D,      &CPU::LD_D_E,
+      &CPU::LD_D_H,     &CPU::LD_D_L,    &CPU::LD_D_dHL,      &CPU::LD_D_A,    &CPU::LD_E_B,      &CPU::LD_E_C,
+      &CPU::LD_E_D,     &CPU::LD_E_E,    &CPU::LD_E_H,        &CPU::LD_E_L,    &CPU::LD_E_dHL,    &CPU::LD_E_A,
+      &CPU::LD_H_B,     &CPU::LD_H_C,    &CPU::LD_H_D,        &CPU::LD_H_E,    &CPU::LD_H_H,      &CPU::LD_H_L,
+      &CPU::LD_H_dHL,   &CPU::LD_H_A,    &CPU::LD_L_B,        &CPU::LD_L_C,    &CPU::LD_L_D,      &CPU::LD_L_E,
+      &CPU::LD_L_H,     &CPU::LD_L_L,    &CPU::LD_L_dHL,      &CPU::LD_L_A,    &CPU::LD_dHL_B,    &CPU::LD_dHL_C,
+      &CPU::LD_dHL_D,   &CPU::LD_dHL_E,  &CPU::LD_dHL_H,      &CPU::LD_dHL_L,  &CPU::HALT,        &CPU::LD_dHL_A,
+      &CPU::LD_A_B,     &CPU::LD_A_C,    &CPU::LD_A_D,        &CPU::LD_A_E,    &CPU::LD_A_H,      &CPU::LD_A_L,
+      &CPU::LD_A_dHL,   &CPU::LD_A_A,    &CPU::ADD_A_B,       &CPU::ADD_A_C,   &CPU::ADD_A_D,     &CPU::ADD_A_E,
+      &CPU::ADD_A_H,    &CPU::ADD_A_L,   &CPU::ADD_A_dHL,     &CPU::ADD_A_A,   &CPU::ADC_A_B,     &CPU::ADC_A_C,
+      &CPU::ADC_A_D,    &CPU::ADC_A_E,   &CPU::ADC_A_H,       &CPU::ADC_A_L,   &CPU::ADC_A_dHL,   &CPU::ADC_A_A,
+      &CPU::SUB_A_B,    &CPU::SUB_A_C,   &CPU::SUB_A_D,       &CPU::SUB_A_E,   &CPU::SUB_A_H,     &CPU::SUB_A_L,
+      &CPU::SUB_A_dHL,  &CPU::SUB_A_A,   &CPU::SBC_A_B,       &CPU::SBC_A_C,   &CPU::SBC_A_D,     &CPU::SBC_A_E,
+      &CPU::SBC_A_H,    &CPU::SBC_A_L,   &CPU::SBC_A_dHL,     &CPU::SBC_A_A,   &CPU::AND_A_B,     &CPU::AND_A_C,
+      &CPU::AND_A_D,    &CPU::AND_A_E,   &CPU::AND_A_H,       &CPU::AND_A_L,   &CPU::AND_A_dHL,   &CPU::AND_A_A,
+      &CPU::XOR_A_B,    &CPU::XOR_A_C,   &CPU::XOR_A_D,       &CPU::XOR_A_E,   &CPU::XOR_A_H,     &CPU::XOR_A_L,
+      &CPU::XOR_A_dHL,  &CPU::XOR_A_A,   &CPU::OR_A_B,        &CPU::OR_A_C,    &CPU::OR_A_D,      &CPU::OR_A_E,
+      &CPU::OR_A_H,     &CPU::OR_A_L,    &CPU::OR_A_dHL,      &CPU::OR_A_A,    &CPU::CP_A_B,      &CPU::CP_A_C,
+      &CPU::CP_A_D,     &CPU::CP_A_E,    &CPU::CP_A_H,        &CPU::CP_A_L,    &CPU::CP_A_dHL,    &CPU::CP_A_A,
+      &CPU::RET_NZ,     &CPU::POP_BC,    &CPU::JP_NZ_A16,     &CPU::JP_A16,    &CPU::CALL_NZ_A16, &CPU::PUSH_BC,
+      &CPU::ADD_A_N8,   &CPU::RST_00,    &CPU::RET_Z,         &CPU::RET,       &CPU::JP_Z_A16,    &CPU::NOP,
+      &CPU::CALL_Z_A16, &CPU::CALL_A16,  &CPU::ADC_A_N8,      &CPU::RST_08,    &CPU::RET_NC,      &CPU::POP_DE,
+      &CPU::JP_NC_A16,  &CPU::NOP,       &CPU::CALL_NC_A16,   &CPU::PUSH_DE,   &CPU::SUB_A_N8,    &CPU::RST_10,
+      &CPU::RET_C,      &CPU::RETI,      &CPU::JP_C_A16,      &CPU::NOP,       &CPU::CALL_C_A16,  &CPU::NOP,
+      &CPU::SBC_A_N8,   &CPU::RST_18,    &CPU::LDH_dA8_A,     &CPU::POP_HL,    &CPU::LDH_dC_A,    &CPU::NOP,
+      &CPU::NOP,        &CPU::PUSH_HL,   &CPU::AND_A_N8,      &CPU::RST_20,    &CPU::ADD_SP_E8,   &CPU::JP_HL,
+      &CPU::LD_dA16_A,  &CPU::NOP,       &CPU::NOP,           &CPU::NOP,       &CPU::XOR_A_N8,    &CPU::RST_28,
+      &CPU::LDH_A_dA8,  &CPU::POP_AF,    &CPU::LDH_A_dC,      &CPU::DI,        &CPU::NOP,         &CPU::PUSH_AF,
+      &CPU::OR_A_N8,    &CPU::RST_30,    &CPU::LD_HL_SP_p_E8, &CPU::LD_SP_HL,  &CPU::LD_A_dA16,   &CPU::EI,
+      &CPU::NOP,        &CPU::NOP,       &CPU::CP_A_N8,       &CPU::RST_38};
+
+  std::array<OpcodeFunction, 256> extendedOpcodeTable = {
+      &CPU::RLC_B,     &CPU::RLC_C,   &CPU::RLC_D,     &CPU::RLC_E,   &CPU::RLC_H,     &CPU::RLC_L,
+      &CPU::RLC_dHL,   &CPU::RLC_A,   &CPU::RRC_B,     &CPU::RRC_C,   &CPU::RRC_D,     &CPU::RRC_E,
+      &CPU::RRC_H,     &CPU::RRC_L,   &CPU::RRC_dHL,   &CPU::RRC_A,   &CPU::RL_B,      &CPU::RL_C,
+      &CPU::RL_D,      &CPU::RL_E,    &CPU::RL_H,      &CPU::RL_L,    &CPU::RL_dHL,    &CPU::RL_A,
+      &CPU::RR_B,      &CPU::RR_C,    &CPU::RR_D,      &CPU::RR_E,    &CPU::RR_H,      &CPU::RR_L,
+      &CPU::RR_dHL,    &CPU::RR_A,    &CPU::SLA_B,     &CPU::SLA_C,   &CPU::SLA_D,     &CPU::SLA_E,
+      &CPU::SLA_H,     &CPU::SLA_L,   &CPU::SLA_dHL,   &CPU::SLA_A,   &CPU::SRA_B,     &CPU::SRA_C,
+      &CPU::SRA_D,     &CPU::SRA_E,   &CPU::SRA_H,     &CPU::SRA_L,   &CPU::SRA_dHL,   &CPU::SRA_A,
+      &CPU::SWAP_B,    &CPU::SWAP_C,  &CPU::SWAP_D,    &CPU::SWAP_E,  &CPU::SWAP_H,    &CPU::SWAP_L,
+      &CPU::SWAP_dHL,  &CPU::SWAP_A,  &CPU::SRL_B,     &CPU::SRL_C,   &CPU::SRL_D,     &CPU::SRL_E,
+      &CPU::SRL_H,     &CPU::SRL_L,   &CPU::SRL_dHL,   &CPU::SRL_A,   &CPU::BIT_0_B,   &CPU::BIT_0_C,
+      &CPU::BIT_0_D,   &CPU::BIT_0_E, &CPU::BIT_0_H,   &CPU::BIT_0_L, &CPU::BIT_0_dHL, &CPU::BIT_0_A,
+      &CPU::BIT_1_B,   &CPU::BIT_1_C, &CPU::BIT_1_D,   &CPU::BIT_1_E, &CPU::BIT_1_H,   &CPU::BIT_1_L,
+      &CPU::BIT_1_dHL, &CPU::BIT_1_A, &CPU::BIT_2_B,   &CPU::BIT_2_C, &CPU::BIT_2_D,   &CPU::BIT_2_E,
+      &CPU::BIT_2_H,   &CPU::BIT_2_L, &CPU::BIT_2_dHL, &CPU::BIT_2_A, &CPU::BIT_3_B,   &CPU::BIT_3_C,
+      &CPU::BIT_3_D,   &CPU::BIT_3_E, &CPU::BIT_3_H,   &CPU::BIT_3_L, &CPU::BIT_3_dHL, &CPU::BIT_3_A,
+      &CPU::BIT_4_B,   &CPU::BIT_4_C, &CPU::BIT_4_D,   &CPU::BIT_4_E, &CPU::BIT_4_H,   &CPU::BIT_4_L,
+      &CPU::BIT_4_dHL, &CPU::BIT_4_A, &CPU::BIT_5_B,   &CPU::BIT_5_C, &CPU::BIT_5_D,   &CPU::BIT_5_E,
+      &CPU::BIT_5_H,   &CPU::BIT_5_L, &CPU::BIT_5_dHL, &CPU::BIT_5_A, &CPU::BIT_6_B,   &CPU::BIT_6_C,
+      &CPU::BIT_6_D,   &CPU::BIT_6_E, &CPU::BIT_6_H,   &CPU::BIT_6_L, &CPU::BIT_6_dHL, &CPU::BIT_6_A,
+      &CPU::BIT_7_B,   &CPU::BIT_7_C, &CPU::BIT_7_D,   &CPU::BIT_7_E, &CPU::BIT_7_H,   &CPU::BIT_7_L,
+      &CPU::BIT_7_dHL, &CPU::BIT_7_A, &CPU::RES_0_B,   &CPU::RES_0_C, &CPU::RES_0_D,   &CPU::RES_0_E,
+      &CPU::RES_0_H,   &CPU::RES_0_L, &CPU::RES_0_dHL, &CPU::RES_0_A, &CPU::RES_1_B,   &CPU::RES_1_C,
+      &CPU::RES_1_D,   &CPU::RES_1_E, &CPU::RES_1_H,   &CPU::RES_1_L, &CPU::RES_1_dHL, &CPU::RES_1_A,
+      &CPU::RES_2_B,   &CPU::RES_2_C, &CPU::RES_2_D,   &CPU::RES_2_E, &CPU::RES_2_H,   &CPU::RES_2_L,
+      &CPU::RES_2_dHL, &CPU::RES_2_A, &CPU::RES_3_B,   &CPU::RES_3_C, &CPU::RES_3_D,   &CPU::RES_3_E,
+      &CPU::RES_3_H,   &CPU::RES_3_L, &CPU::RES_3_dHL, &CPU::RES_3_A, &CPU::RES_4_B,   &CPU::RES_4_C,
+      &CPU::RES_4_D,   &CPU::RES_4_E, &CPU::RES_4_H,   &CPU::RES_4_L, &CPU::RES_4_dHL, &CPU::RES_4_A,
+      &CPU::RES_5_B,   &CPU::RES_5_C, &CPU::RES_5_D,   &CPU::RES_5_E, &CPU::RES_5_H,   &CPU::RES_5_L,
+      &CPU::RES_5_dHL, &CPU::RES_5_A, &CPU::RES_6_B,   &CPU::RES_6_C, &CPU::RES_6_D,   &CPU::RES_6_E,
+      &CPU::RES_6_H,   &CPU::RES_6_L, &CPU::RES_6_dHL, &CPU::RES_6_A, &CPU::RES_7_B,   &CPU::RES_7_C,
+      &CPU::RES_7_D,   &CPU::RES_7_E, &CPU::RES_7_H,   &CPU::RES_7_L, &CPU::RES_7_dHL, &CPU::RES_7_A,
+      &CPU::SET_0_B,   &CPU::SET_0_C, &CPU::SET_0_D,   &CPU::SET_0_E, &CPU::SET_0_H,   &CPU::SET_0_L,
+      &CPU::SET_0_dHL, &CPU::SET_0_A, &CPU::SET_1_B,   &CPU::SET_1_C, &CPU::SET_1_D,   &CPU::SET_1_E,
+      &CPU::SET_1_H,   &CPU::SET_1_L, &CPU::SET_1_dHL, &CPU::SET_1_A, &CPU::SET_2_B,   &CPU::SET_2_C,
+      &CPU::SET_2_D,   &CPU::SET_2_E, &CPU::SET_2_H,   &CPU::SET_2_L, &CPU::SET_2_dHL, &CPU::SET_2_A,
+      &CPU::SET_3_B,   &CPU::SET_3_C, &CPU::SET_3_D,   &CPU::SET_3_E, &CPU::SET_3_H,   &CPU::SET_3_L,
+      &CPU::SET_3_dHL, &CPU::SET_3_A, &CPU::SET_4_B,   &CPU::SET_4_C, &CPU::SET_4_D,   &CPU::SET_4_E,
+      &CPU::SET_4_H,   &CPU::SET_4_L, &CPU::SET_4_dHL, &CPU::SET_4_A, &CPU::SET_5_B,   &CPU::SET_5_C,
+      &CPU::SET_5_D,   &CPU::SET_5_E, &CPU::SET_5_H,   &CPU::SET_5_L, &CPU::SET_5_dHL, &CPU::SET_5_A,
+      &CPU::SET_6_B,   &CPU::SET_6_C, &CPU::SET_6_D,   &CPU::SET_6_E, &CPU::SET_6_H,   &CPU::SET_6_L,
+      &CPU::SET_6_dHL, &CPU::SET_6_A, &CPU::SET_7_B,   &CPU::SET_7_C, &CPU::SET_7_D,   &CPU::SET_7_E,
+      &CPU::SET_7_H,   &CPU::SET_7_L, &CPU::SET_7_dHL, &CPU::SET_7_A};
 
 public:
   CPU(MMU& mmu) : mmu(mmu) {}
