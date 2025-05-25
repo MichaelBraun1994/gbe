@@ -52,6 +52,7 @@ class CPU
     };
     std::uint16_t SP;
     std::uint16_t PC;
+    bool IME;
 
     void SetFlag(int bit, bool value);
     bool GetFlag(int bit);
@@ -82,7 +83,35 @@ class CPU
   void INC_R8(std::uint8_t& reg);
   void DEC_R8(std::uint8_t& reg);
 
-  void ADD_HL_R16(std::uint16_t& reg);
+  void ADD_A_R8(const std::uint8_t& reg);
+  void ADD_HL_R16(const std::uint16_t& reg);
+
+  void ADC_A_R8(const std::uint8_t& reg);
+
+  void SUB_A_R8(const std::uint8_t& reg);
+  void SBC_A_R8(const std::uint8_t& reg);
+
+  void AND_A_R8(const std::uint8_t& reg);
+  void XOR_A_R8(const std::uint8_t& reg);
+  void OR_A_R8(const std::uint8_t& reg);
+  void CP_A_R8(const std::uint8_t& reg);
+
+  void RST_VEC(const std::uint16_t);
+
+  void RL_R8(std::uint8_t& reg);
+  void RR_R8(std::uint8_t& reg);
+
+  void SLA_R8(std::uint8_t& reg);
+  void SRA_R8(std::uint8_t& reg);
+  void SRL_R8(std::uint8_t& reg);
+
+  void RLC_R8(std::uint8_t& reg);
+  void RRC_R8(std::uint8_t& reg);
+
+  void SWAP_R8(std::uint8_t& reg);
+
+  void PUSH_N16(const std::uint16_t& value);
+  std::uint16_t POP_N16();
 
   std::uint8_t GetN8();
   std::uint16_t GetN16();
@@ -91,8 +120,14 @@ class CPU
 
   void JR_CC_E8(bool condition);
 
-  bool IsHalfCarryOverflowADD16(std::uint16_t a, std::uint16_t b);
-  bool IsCarryOverflowADD16(std::uint16_t a, std::uint16_t b);
+  bool IsHalfCarryOverflow8(const std::uint8_t a, const std::uint8_t b);
+  bool IsCarryOverflow8(const std::uint8_t a, const std::uint8_t b);
+
+  bool IsHalfCarryOverflow16(const std::uint16_t a, const std::uint16_t b);
+  bool IsCarryOverflow16(const std::uint16_t a, const std::uint16_t b);
+
+  bool IsHalfCarryUnderflow8(const std::uint8_t a, const std::uint8_t b);
+  bool IsCarryUnderflow8(const std::uint8_t a, const std::uint8_t b);
 
   // opcodes
   using OpcodeFunction = void (CPU::*)();
@@ -327,8 +362,8 @@ class CPU
   void RETI();
   void JP_C_A16();
   void CALL_C_A16();
-  void RST_18();
   void SBC_A_N8();
+  void RST_18();
 
   void LDH_dA8_A();
   void POP_HL();
