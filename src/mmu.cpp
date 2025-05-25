@@ -6,14 +6,6 @@
 #include <string>
 #include <fstream>
 
-void MMU::AssertAddress(Address address)
-{
-  if (address >= memorySize)
-  {
-    throw std::runtime_error{"Out of bounds memory access: " + std::to_string(address)};
-  }
-}
-
 MMU::MMU()
 {
   std::fill(memmory.begin(), memmory.end(), 0xFF);
@@ -45,12 +37,15 @@ void MMU::LoadROM(const std::string& filePath)
 
 void MMU::Set(Address address, std::uint8_t value)
 {
-  AssertAddress(address);
   memmory[address] = value;
 }
 
 std::uint8_t MMU::Get(Address address)
 {
-  AssertAddress(address);
+  if (address == 0xFF44)
+  {
+    return 0x90;
+  }
+
   return memmory[address];
 }

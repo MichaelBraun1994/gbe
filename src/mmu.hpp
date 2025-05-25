@@ -9,10 +9,8 @@ using Address = std::uint16_t;
 
 class MMU
 {
-  static constexpr int memorySize = std::numeric_limits<std::uint16_t>::max();
+  static constexpr int memorySize = std::numeric_limits<std::uint16_t>::max() + 1;
   std::array<std::uint8_t, memorySize> memmory;
-
-  void AssertAddress(Address address);
 
 public:
   MMU();

@@ -4,17 +4,30 @@
 
 void CPU::ExecuteOpcode(std::uint8_t opcode)
 {
-  PLOG(plog::info) << "Executing OPCode(PC: " << std::uppercase << std::setfill('0') << std::setw(2) << std::hex
-                   << registers.PC << "): 0x" << std::uppercase << std::setfill('0') << std::setw(2) << std::hex
-                   << static_cast<int>(opcode);
-  //(this->*opcodeTable[opcode])();
+  const OpcodeDescription& opcodeDescription = opcodeTable[opcode];
+
+  (this->*opcodeTable[opcode].opcode)();
+
+  if (!jumped)
+  {
+    registers.PC += opcodeTable[opcode].length;
+  }
+
+  jumped = false;
 }
 
 void CPU::ExecuteExtendedOpcode(std::uint8_t opcode)
 {
-  PLOG(plog::info) << "Executing extended OPCode: 0xCB" << std::uppercase << std::setfill('0') << std::setw(2)
-                   << std::hex << static_cast<int>(opcode);
-  //(this->*extendedOpcodeTable[opcode])();
+  const OpcodeDescription& opcodeDescription = extendedOpcodeTable[opcode];
+
+  (this->*extendedOpcodeTable[opcode].opcode)();
+
+  if (!jumped)
+  {
+    registers.PC += extendedOpcodeTable[opcode].length;
+  }
+
+  jumped = false;
 }
 
 void CPU::Halt()
@@ -24,28 +37,17 @@ void CPU::Halt()
 
 void CPU::Tick()
 {
+  PrintCPUState();
+
   std::uint8_t opcode = mmu.Get(registers.PC);
   if (opcode == extendedOpcodePrefix)
   {
-    ++registers.PC;
+    opcode = mmu.Get(registers.PC + 1);
     ExecuteExtendedOpcode(opcode);
   }
   else
   {
     ExecuteOpcode(opcode);
-  }
-  ++registers.PC;
-
-  if (mmu.Get(0xff02) == 0x81)
-  {
-    char c = mmu.Get(0xff01);
-    printf("%c", c);
-    mmu.Set(0xff02, 0x0);
-  }
-
-  if (registers.PC >= 0x200)
-  {
-    HALT();
   }
 }
 
@@ -114,7 +116,7 @@ bool CPU::Registers::GetCarryFlag()
 void CPU::INC_R8(std::uint8_t& reg)
 {
   registers.SetSubtractionFlag(false);
-  registers.SetHalfCarryFlag(reg & 0x0F);
+  registers.SetHalfCarryFlag(IsHalfCarryOverflow8(reg, 1));
   ++reg;
   registers.SetZeroFlag(reg == 0);
 }
@@ -122,9 +124,9 @@ void CPU::INC_R8(std::uint8_t& reg)
 void CPU::DEC_R8(std::uint8_t& reg)
 {
   registers.SetSubtractionFlag(true);
+  registers.SetHalfCarryFlag(IsHalfCarryUnderflow8(reg, 1));
   --reg;
   registers.SetZeroFlag(reg == 0);
-  registers.SetHalfCarryFlag((reg & 0x0F) == 0x0F);
 }
 
 void CPU::ADD_A_R8(const std::uint8_t& reg)
@@ -150,9 +152,12 @@ void CPU::ADC_A_R8(const std::uint8_t& reg)
 {
   registers.SetSubtractionFlag(false);
   registers.SetHalfCarryFlag(IsHalfCarryOverflow8(registers.A, reg + registers.GetCarryFlag()));
+
+  bool oldCarryFlag = registers.GetCarryFlag();
   registers.SetCarryFlag(IsCarryOverflow8(registers.A, reg + registers.GetCarryFlag()));
 
-  registers.A += reg + registers.GetCarryFlag();
+  registers.A += reg + oldCarryFlag;
+
   registers.SetZeroFlag(registers.A == 0);
 }
 
@@ -171,9 +176,11 @@ void CPU::SBC_A_R8(const std::uint8_t& reg)
 {
   registers.SetSubtractionFlag(true);
   registers.SetHalfCarryFlag(IsHalfCarryUnderflow8(registers.A, reg + registers.GetCarryFlag()));
+
+  bool oldCarryFlag = registers.GetCarryFlag();
   registers.SetCarryFlag(IsCarryUnderflow8(registers.A, reg + registers.GetCarryFlag()));
 
-  registers.A -= reg + registers.GetCarryFlag();
+  registers.A -= reg + oldCarryFlag;
 
   registers.SetZeroFlag(registers.A == 0);
 }
@@ -217,7 +224,7 @@ void CPU::CP_A_R8(const std::uint8_t& reg)
   registers.SetHalfCarryFlag(IsHalfCarryUnderflow8(registers.A, reg));
   registers.SetCarryFlag(IsCarryUnderflow8(registers.A, reg));
 
-  registers.SetZeroFlag(registers.A == 0);
+  registers.SetZeroFlag((registers.A - reg) == 0);
 }
 
 void CPU::RST_VEC(const std::uint16_t)
@@ -232,7 +239,7 @@ void CPU::RL_R8(std::uint8_t& reg)
 
   bool msb = reg & (1 << 7);
   reg <<= 1;
-  reg &= registers.GetCarryFlag();
+  reg |= registers.GetCarryFlag();
 
   registers.SetCarryFlag(msb);
   registers.SetZeroFlag(reg == 0);
@@ -245,7 +252,7 @@ void CPU::RR_R8(std::uint8_t& reg)
 
   bool lsb = reg & 1;
   reg >>= 1;
-  reg &= (registers.GetCarryFlag() << 7);
+  reg |= (registers.GetCarryFlag() << 7);
 
   registers.SetCarryFlag(lsb);
   registers.SetZeroFlag(reg == 0);
@@ -270,7 +277,7 @@ void CPU::SRA_R8(std::uint8_t& reg)
 
   bool msb = reg & (1 << 7);
   reg >>= 1;
-  reg &= (msb << 7);
+  reg |= (msb << 7);
 
   registers.SetZeroFlag(reg == 0);
 }
@@ -320,7 +327,7 @@ void CPU::SWAP_R8(std::uint8_t& reg)
 
   std::uint8_t lowNibble = (reg & 0x0F);
   std::uint8_t highNibble = (reg >> 4);
-  reg = ((lowNibble << 4) & highNibble);
+  reg = ((lowNibble << 4) | highNibble);
 
   registers.SetZeroFlag(reg == 0);
 }
@@ -357,25 +364,25 @@ std::uint16_t CPU::POP_N16()
   std::uint8_t highByte = mmu.Get(registers.SP);
   ++registers.SP;
 
-  return ((highByte << 8) & lowByte);
+  return ((highByte << 8) | lowByte);
 }
 
 std::uint8_t CPU::GetN8()
 {
-  return mmu.Get(registers.PC++);
+  return mmu.Get(registers.PC + 1);
 }
 
 std::uint16_t CPU::GetN16()
 {
-  std::uint8_t low = mmu.Get(registers.PC++);
-  std::uint8_t high = mmu.Get(registers.PC++);
+  std::uint8_t low = mmu.Get(registers.PC + 1);
+  std::uint8_t high = mmu.Get(registers.PC + 2);
 
-  return (high << 8) & low;
+  return (high << 8) | low;
 }
 
 std::int8_t CPU::GetE8()
 {
-  return mmu.Get(registers.PC++);
+  return mmu.Get(registers.PC + 1);
 }
 
 void CPU::JR_CC_E8(bool condition)
@@ -390,7 +397,7 @@ void CPU::JR_CC_E8(bool condition)
 
 bool CPU::IsHalfCarryOverflow8(const std::uint8_t a, const std::uint8_t b)
 {
-  return ((a & 0x08) + (b & 0x08)) > 0x08;
+  return ((a & 0x0F) + (b & 0x0F)) > 0x0F;
 }
 
 bool CPU::IsCarryOverflow8(const std::uint8_t a, const std::uint8_t b)
@@ -401,7 +408,7 @@ bool CPU::IsCarryOverflow8(const std::uint8_t a, const std::uint8_t b)
 bool CPU::IsHalfCarryOverflow16(const std::uint16_t a, const std::uint16_t b)
 {
   // Overflow from bit 11
-  return ((a & 0x07FF) + (b & 0x07FF)) > 0x07FF;
+  return ((a & 0x0FFF) + (b & 0x0FFF)) > 0x0FFF;
 }
 
 bool CPU::IsCarryOverflow16(const std::uint16_t a, const std::uint16_t b)
@@ -411,7 +418,7 @@ bool CPU::IsCarryOverflow16(const std::uint16_t a, const std::uint16_t b)
 
 bool CPU::IsHalfCarryUnderflow8(const std::uint8_t a, const std::uint8_t b)
 {
-  return ((a & 0x10) < (b & 0x10));
+  return ((a & 0x0F) < (b & 0x0F));
 }
 
 bool CPU::IsCarryUnderflow8(const std::uint8_t a, const std::uint8_t b)
@@ -517,6 +524,7 @@ void CPU::RRCA()
 void CPU::STOP_N8()
 {
   std::uint8_t nextByte = mmu.Get(++registers.PC);
+  halted = true;
   if (nextByte)
   {
     throw std::runtime_error{"Unexpected Stop Opcode."};
@@ -1470,7 +1478,8 @@ void CPU::JP_NZ_A16()
 
 void CPU::JP_A16()
 {
-  registers.PC = GetN16() - 1;
+  registers.PC = GetN16();
+  jumped = true;
 }
 
 void CPU::CALL_NZ_A16()
@@ -1483,14 +1492,17 @@ void CPU::CALL_NZ_A16()
 
 void CPU::PUSH_BC()
 {
+  PUSH_N16(registers.BC);
 }
 
 void CPU::ADD_A_N8()
 {
+  ADD_A_R8(GetN8());
 }
 
 void CPU::RST_00()
 {
+  RST_VEC(0x00);
 }
 
 void CPU::RET_Z()
@@ -1504,7 +1516,8 @@ void CPU::RET_Z()
 void CPU::RET()
 {
   std::uint16_t returnAddress = POP_N16();
-  registers.PC = returnAddress - 1;
+  registers.PC = returnAddress;
+  jumped = true;
 }
 
 void CPU::JP_Z_A16()
@@ -1525,7 +1538,7 @@ void CPU::CALL_Z_A16()
 
 void CPU::CALL_A16()
 {
-  PUSH_N16(registers.PC + 2);
+  PUSH_N16(registers.PC + 3);
   JP_A16();
 }
 
@@ -1669,7 +1682,8 @@ void CPU::ADD_SP_E8()
 
 void CPU::JP_HL()
 {
-  registers.PC = registers.HL - 1;
+  registers.PC = registers.HL;
+  jumped = true;
 }
 
 void CPU::LD_dA16_A()
@@ -3099,4 +3113,33 @@ void CPU::SET_7_dHL()
 void CPU::SET_7_A()
 {
   SET_R8(registers.A, 7);
+}
+
+#include <fstream>
+
+void CPU::PrintCPUState()
+{
+  std::ofstream outFile("doclog.txt", std::ios_base::app);
+
+  outFile << std::hex << std::uppercase << std::setfill('0');
+
+  outFile << "A:" << std::setw(2) << static_cast<int>(registers.A) << " F:" << std::setw(2)
+          << static_cast<int>(registers.F) << " B:" << std::setw(2) << static_cast<int>(registers.B)
+          << " C:" << std::setw(2) << static_cast<int>(registers.C) << " D:" << std::setw(2)
+          << static_cast<int>(registers.D) << " E:" << std::setw(2) << static_cast<int>(registers.E)
+          << " H:" << std::setw(2) << static_cast<int>(registers.H) << " L:" << std::setw(2)
+          << static_cast<int>(registers.L) << " SP:" << std::setw(4) << registers.SP << " PC:" << std::setw(4)
+          << registers.PC;
+
+  outFile << " PCMEM:";
+  for (int i = 0; i < 4; ++i)
+  {
+    outFile << std::setw(2) << static_cast<int>(mmu.Get(registers.PC + i));
+    if (i < 3)
+    {
+      outFile << ",";
+    }
+  }
+  outFile << "\n";
+  outFile.close();
 }
