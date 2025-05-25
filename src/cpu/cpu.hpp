@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <vector>
 #include <array>
 
 class MMU;
@@ -77,6 +78,7 @@ class CPU
   bool halted = false;
 
   void ExecuteOpcode(std::uint8_t opcode);
+  void ExecuteExtendedOpcode(std::uint8_t opcode);
   void Halt();
 
   // operations
@@ -652,7 +654,14 @@ class CPU
   void SET_7_A();
 
   using OpcodeFunction = void (CPU::*)();
-  static constexpr std::uint8_t ExtendedOpcodePrefix = 0xCB;
+  static constexpr std::uint8_t extendedOpcodePrefix = 0xCB;
+
+  struct OpcodeDescription
+  {
+    OpcodeFunction opcode;
+    int length;
+    std::vector<int> cycles;
+  };
 
   std::array<OpcodeFunction, 256> opcodeTable = {
       &CPU::NOP,        &CPU::LD_BC_N16, &CPU::LD_dBC_A,      &CPU::INC_BC,    &CPU::INC_B,       &CPU::DEC_B,
@@ -745,7 +754,7 @@ class CPU
       &CPU::SET_7_H,   &CPU::SET_7_L, &CPU::SET_7_dHL, &CPU::SET_7_A};
 
 public:
-  CPU(MMU& mmu) : mmu(mmu) {}
+  CPU(MMU& mmu) : mmu(mmu) { registers.PC = 0x100; }
   void Tick();
 
   bool IsHalted() { return halted; }

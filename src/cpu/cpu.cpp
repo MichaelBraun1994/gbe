@@ -4,8 +4,17 @@
 
 void CPU::ExecuteOpcode(std::uint8_t opcode)
 {
-  PLOG(plog::info) << "Executing OPCode: 0x" << std::uppercase << std::setfill('0') << std::setw(2) << std::hex
+  PLOG(plog::info) << "Executing OPCode(PC: " << std::uppercase << std::setfill('0') << std::setw(2) << std::hex
+                   << registers.PC << "): 0x" << std::uppercase << std::setfill('0') << std::setw(2) << std::hex
                    << static_cast<int>(opcode);
+  //(this->*opcodeTable[opcode])();
+}
+
+void CPU::ExecuteExtendedOpcode(std::uint8_t opcode)
+{
+  PLOG(plog::info) << "Executing extended OPCode: 0xCB" << std::uppercase << std::setfill('0') << std::setw(2)
+                   << std::hex << static_cast<int>(opcode);
+  //(this->*extendedOpcodeTable[opcode])();
 }
 
 void CPU::Halt()
@@ -16,12 +25,27 @@ void CPU::Halt()
 void CPU::Tick()
 {
   std::uint8_t opcode = mmu.Get(registers.PC);
-  ExecuteOpcode(opcode);
+  if (opcode == extendedOpcodePrefix)
+  {
+    ++registers.PC;
+    ExecuteExtendedOpcode(opcode);
+  }
+  else
+  {
+    ExecuteOpcode(opcode);
+  }
   ++registers.PC;
 
-  if (registers.PC >= 0x100)
+  if (mmu.Get(0xff02) == 0x81)
   {
-    Halt();
+    char c = mmu.Get(0xff01);
+    printf("%c", c);
+    mmu.Set(0xff02, 0x0);
+  }
+
+  if (registers.PC >= 0x200)
+  {
+    HALT();
   }
 }
 
@@ -1054,6 +1078,7 @@ void CPU::LD_dHL_L()
 
 void CPU::HALT()
 {
+  halted = true;
   // TODO IMPLEMENT INTERRUPT HANDLING
 }
 
@@ -2580,6 +2605,11 @@ void CPU::RES_4_B()
 void CPU::RES_4_C()
 {
   RES_R8(registers.C, 4);
+}
+
+void CPU::RES_4_D()
+{
+  RES_R8(registers.D, 4);
 }
 
 void CPU::RES_4_E()
