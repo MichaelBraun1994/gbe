@@ -57,7 +57,7 @@ void GameBoy::TurnOn()
     HandleInputs();
 
     cpu->Tick();
-    if (cpu->isHalted())
+    if (cpu->IsHalted())
     {
       TurnOff();
     }
