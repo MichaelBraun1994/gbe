@@ -1,6 +1,135 @@
 #include "cpu.hpp"
+
+#include <fstream>
+
 #include "../mmu.hpp"
 #include "../logger.hpp"
+#include "../bits.hpp"
+
+/**
+ * @brief Clears first three bits as they are always 0.
+ */
+void CPU::SanitizeFlags()
+{
+  registers.F = registers.F & 0xF0;
+}
+
+bool CPU::IsInterruptEnabled(int interruptBitpos)
+{
+  return bits::GetBit(GetIE(), interruptBitpos);
+}
+
+void CPU::EnableInterrupt(int interruptBitpos)
+{
+  bits::SetBit(GetIE(), interruptBitpos);
+}
+
+void CPU::DisableInterrupt(int interruptBitpos)
+{
+  bits::ClearBit(GetIE(), interruptBitpos);
+}
+
+bool CPU::IsInterruptPending(int interruptBitpos)
+{
+  return bits::GetBit(GetIF(), interruptBitpos);
+}
+
+void CPU::RequestInterrupt(int interruptBitpos)
+{
+  bits::SetBit(GetIF(), interruptBitpos);
+}
+
+void CPU::ResetInterrupt(int interruptBitpos)
+{
+  bits::ClearBit(GetIF(), interruptBitpos);
+}
+
+std::uint8_t CPU::GetIF()
+{
+  return mmu.Get(interrupts::IF_ADDRESS);
+}
+
+std::uint8_t CPU::GetIE()
+{
+  return mmu.Get(interrupts::IE_ADDRESS);
+}
+
+void CPU::SetIF(const std::uint8_t value)
+{
+  return mmu.Set(interrupts::IF_ADDRESS, value);
+}
+
+void CPU::SetIE(const std::uint8_t value)
+{
+  return mmu.Set(interrupts::IE_ADDRESS, value);
+}
+
+/**
+ * @brief Sets IME after after trigger and one opcode was executed.
+ */
+void CPU::HandleIMESetting()
+{
+  if (setIMEAfterNextInstruction)
+  {
+    registers.IME = true;
+  }
+}
+
+void CPU::HandleInterrupts()
+{
+  HandleIMESetting();
+
+  if (!registers.IME)
+  {
+    return;
+  }
+
+  if (!(GetIE() & GetIF()))
+  {
+    return;
+  }
+
+  if (IsInterruptEnabled(interrupts::bitpos::VBLANK) && IsInterruptPending(interrupts::bitpos::VBLANK))
+  {
+    PUSH_N16(registers.PC);
+    registers.PC = interrupts::vectorAddress::VBLANK;
+
+    ResetInterrupt(interrupts::bitpos::VBLANK);
+    registers.IME = false;
+  }
+  else if (IsInterruptEnabled(interrupts::bitpos::LCD) && IsInterruptPending(interrupts::bitpos::LCD))
+  {
+    PUSH_N16(registers.PC);
+    registers.PC = interrupts::vectorAddress::LCD;
+
+    ResetInterrupt(interrupts::bitpos::LCD);
+    registers.IME = false;
+  }
+  else if (IsInterruptEnabled(interrupts::bitpos::TIMER) && IsInterruptPending(interrupts::bitpos::TIMER))
+  {
+    PUSH_N16(registers.PC);
+    registers.PC = interrupts::vectorAddress::TIMER;
+
+    ResetInterrupt(interrupts::bitpos::TIMER);
+    registers.IME = false;
+  }
+  else if (IsInterruptEnabled(interrupts::bitpos::SERIAL) && IsInterruptPending(interrupts::bitpos::SERIAL))
+  {
+    PUSH_N16(registers.PC);
+    registers.PC = interrupts::vectorAddress::SERIAL;
+
+    ResetInterrupt(interrupts::bitpos::SERIAL);
+    registers.IME = false;
+  }
+  else if (IsInterruptEnabled(interrupts::bitpos::JOYPAD) && IsInterruptPending(interrupts::bitpos::JOYPAD))
+  {
+    PUSH_N16(registers.PC);
+    registers.PC = interrupts::vectorAddress::JOYPAD;
+
+    ResetInterrupt(interrupts::bitpos::JOYPAD);
+    registers.IME = false;
+  }
+}
 
 void CPU::ExecuteOpcode(std::uint8_t opcode)
 {
@@ -37,9 +166,11 @@ void CPU::Halt()
 
 void CPU::Tick()
 {
-  PrintCPUState();
+  // PrintCPUState();
+  PrintBLARGGSerial();
 
   std::uint8_t opcode = mmu.Get(registers.PC);
+
   if (opcode == extendedOpcodePrefix)
   {
     opcode = mmu.Get(registers.PC + 1);
@@ -49,6 +180,8 @@ void CPU::Tick()
   {
     ExecuteOpcode(opcode);
   }
+
+  HandleInterrupts();
 }
 
 void CPU::Registers::SetFlag(int bit, bool value)
@@ -151,11 +284,10 @@ void CPU::ADD_HL_R16(const std::uint16_t& reg)
 void CPU::ADC_A_R8(const std::uint8_t& reg)
 {
   registers.SetSubtractionFlag(false);
-  registers.SetHalfCarryFlag(IsHalfCarryOverflow8(registers.A, reg + registers.GetCarryFlag()));
-
   bool oldCarryFlag = registers.GetCarryFlag();
-  registers.SetCarryFlag(IsCarryOverflow8(registers.A, reg + registers.GetCarryFlag()));
 
+  registers.SetHalfCarryFlag((registers.A & 0xF) + (reg & 0xF) + oldCarryFlag > 0xF);
+  registers.SetCarryFlag((registers.A & 0xFF) + (reg & 0xFF) + oldCarryFlag > 0xFF);
   registers.A += reg + oldCarryFlag;
 
   registers.SetZeroFlag(registers.A == 0);
@@ -174,11 +306,11 @@ void CPU::SUB_A_R8(const std::uint8_t& reg)
 
 void CPU::SBC_A_R8(const std::uint8_t& reg)
 {
-  registers.SetSubtractionFlag(true);
-  registers.SetHalfCarryFlag(IsHalfCarryUnderflow8(registers.A, reg + registers.GetCarryFlag()));
-
   bool oldCarryFlag = registers.GetCarryFlag();
-  registers.SetCarryFlag(IsCarryUnderflow8(registers.A, reg + registers.GetCarryFlag()));
+
+  registers.SetSubtractionFlag(true);
+  registers.SetHalfCarryFlag((registers.A & 0xF) < ((reg & 0xF) + oldCarryFlag));
+  registers.SetCarryFlag(registers.A < (reg + oldCarryFlag));
 
   registers.A -= reg + oldCarryFlag;
 
@@ -227,9 +359,10 @@ void CPU::CP_A_R8(const std::uint8_t& reg)
   registers.SetZeroFlag((registers.A - reg) == 0);
 }
 
-void CPU::RST_VEC(const std::uint16_t)
+void CPU::RST_VEC(const std::uint16_t addr)
 {
-  // TODO IMPLEMENT INTERRUPTION HANDLING
+  PUSH_N16(registers.PC + 1);
+  registers.PC = addr;
 }
 
 void CPU::RL_R8(std::uint8_t& reg)
@@ -516,9 +649,12 @@ void CPU::RRCA()
   registers.SetZeroFlag(false);
   registers.SetSubtractionFlag(false);
   registers.SetHalfCarryFlag(false);
-  registers.SetCarryFlag(registers.A & 1);
 
+  int lsb = registers.A & 1;
+
+  registers.SetCarryFlag(lsb);
   registers.A = (registers.A >> 1);
+  registers.A |= (lsb << 7);
 }
 
 void CPU::STOP_N8()
@@ -685,6 +821,9 @@ void CPU::DAA()
     }
     registers.A += adjustment;
   }
+
+  registers.SetHalfCarryFlag(false);
+  registers.SetZeroFlag(registers.A == 0);
 }
 
 void CPU::JR_Z_E8()
@@ -751,12 +890,24 @@ void CPU::INC_SP()
 
 void CPU::INC_dHL()
 {
-  mmu.Set(registers.HL, mmu.Get(registers.HL) + 1);
+  std::uint8_t oldValue = mmu.Get(registers.HL);
+  std::uint8_t newValue = mmu.Get(registers.HL) + 1;
+
+  registers.SetSubtractionFlag(false);
+  registers.SetHalfCarryFlag(IsHalfCarryOverflow8(oldValue, 1));
+  mmu.Set(registers.HL, newValue);
+  registers.SetZeroFlag(newValue == 0);
 }
 
 void CPU::DEC_dHL()
 {
-  mmu.Set(registers.HL, mmu.Get(registers.HL) - 1);
+  std::uint8_t oldValue = mmu.Get(registers.HL);
+  std::uint8_t newValue = mmu.Get(registers.HL) - 1;
+
+  registers.SetSubtractionFlag(true);
+  registers.SetHalfCarryFlag(IsHalfCarryUnderflow8(oldValue, 1));
+  mmu.Set(registers.HL, newValue);
+  registers.SetZeroFlag(newValue == 0);
 }
 
 void CPU::LD_dHL_N8()
@@ -811,7 +962,7 @@ void CPU::CCF()
   registers.SetSubtractionFlag(false);
   registers.SetHalfCarryFlag(false);
 
-  registers.SetHalfCarryFlag(!registers.GetHalfCarryFlag());
+  registers.SetCarryFlag(!registers.GetCarryFlag());
 }
 
 void CPU::LD_B_B()
@@ -1674,8 +1825,8 @@ void CPU::ADD_SP_E8()
 
   registers.SetZeroFlag(false);
   registers.SetSubtractionFlag(false);
-  registers.SetHalfCarryFlag(IsHalfCarryOverflow16(registers.SP, offset));
-  registers.SetCarryFlag(IsCarryOverflow16(registers.SP, offset));
+  registers.SetHalfCarryFlag(IsHalfCarryOverflow8(registers.SP, offset));
+  registers.SetCarryFlag(IsCarryOverflow8(registers.SP, offset));
 
   registers.SP += offset;
 }
@@ -1710,6 +1861,7 @@ void CPU::LDH_A_dA8()
 void CPU::POP_AF()
 {
   registers.AF = POP_N16();
+  SanitizeFlags();
 }
 
 void CPU::LDH_A_dC()
@@ -1721,10 +1873,12 @@ void CPU::LDH_A_dC()
 void CPU::DI()
 {
   registers.IME = false;
+  setIMEAfterNextInstruction = false;
 }
 
 void CPU::PUSH_AF()
 {
+  SanitizeFlags();
   PUSH_N16(registers.AF);
 }
 
@@ -1740,7 +1894,12 @@ void CPU::RST_30()
 
 void CPU::LD_HL_SP_p_E8()
 {
-  registers.HL = registers.SP + GetE8();
+  std::int8_t e8 = GetE8();
+  registers.SetZeroFlag(false);
+  registers.SetSubtractionFlag(false);
+  registers.SetHalfCarryFlag(IsHalfCarryOverflow8(registers.SP, e8));
+  registers.SetCarryFlag(IsCarryOverflow8(registers.SP, e8));
+  registers.HL = registers.SP + e8;
 }
 
 void CPU::LD_SP_HL()
@@ -1755,7 +1914,7 @@ void CPU::LD_A_dA16()
 
 void CPU::EI()
 {
-  registers.IME = true;
+  setIMEAfterNextInstruction = true;
 }
 
 void CPU::CP_A_N8()
@@ -2470,7 +2629,7 @@ void CPU::RES_0_H()
 
 void CPU::RES_0_L()
 {
-  RES_R8(registers.H, 0);
+  RES_R8(registers.L, 0);
 }
 
 void CPU::RES_0_dHL()
@@ -3115,11 +3274,9 @@ void CPU::SET_7_A()
   SET_R8(registers.A, 7);
 }
 
-#include <fstream>
-
 void CPU::PrintCPUState()
 {
-  std::ofstream outFile("doclog.txt", std::ios_base::app);
+  static std::ofstream outFile("doclog.txt", std::ios_base::app);
 
   outFile << std::hex << std::uppercase << std::setfill('0');
 
@@ -3140,6 +3297,26 @@ void CPU::PrintCPUState()
       outFile << ",";
     }
   }
+
+  outFile << " SPMEM:";
+  for (int i = 0; i < 4; ++i)
+  {
+    outFile << std::setw(2) << static_cast<int>(mmu.Get(registers.SP + i));
+    if (i < 3)
+    {
+      outFile << ",";
+    }
+  }
+
   outFile << "\n";
-  outFile.close();
+}
+
+void CPU::PrintBLARGGSerial()
+{
+  if (mmu.Get(0xff02) == 0x81)
+  {
+    char c = mmu.Get(0xff01);
+    printf("%c", c);
+    mmu.Set(0xff02, 0x0);
+  }
 }

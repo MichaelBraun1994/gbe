@@ -10,13 +10,11 @@
 std::unique_ptr<GameBoy> GameBoy::Create()
 {
   auto mmu = std::make_unique<MMU>();
-  return std::make_unique<GameBoy>(std::move(mmu), std::make_unique<CPU>(*mmu),
-                                   std::make_unique<PPU>(displayWidth, displayHeight), std::make_unique<Controls>());
+  return std::make_unique<GameBoy>(std::move(mmu), std::make_unique<CPU>(*mmu), std::make_unique<Controls>());
 }
 
-GameBoy::GameBoy(std::unique_ptr<MMU> mmu, std::unique_ptr<CPU> cpu, std::unique_ptr<PPU> ppu,
-                 std::unique_ptr<Controls> controls)
-    : mmu(std::move(mmu)), cpu(std::move(cpu)), ppu(std::move(ppu)), controls(std::move(controls))
+GameBoy::GameBoy(std::unique_ptr<MMU> mmu, std::unique_ptr<CPU> cpu, std::unique_ptr<Controls> controls)
+    : mmu(std::move(mmu)), cpu(std::move(cpu)), controls(std::move(controls))
 {
 }
 GameBoy::~GameBoy()
@@ -54,7 +52,7 @@ void GameBoy::TurnOn()
 
   while (turnedOn)
   {
-    HandleInputs();
+    // HandleInputs();
 
     cpu->Tick();
     if (cpu->IsHalted())
@@ -62,9 +60,7 @@ void GameBoy::TurnOn()
       TurnOff();
     }
 
-    ppu->Update();
-
-    SDL_Delay(1);
+    // ppu->Update();
   }
 }
 

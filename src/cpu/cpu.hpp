@@ -6,6 +6,31 @@
 
 class MMU;
 
+namespace interrupts
+{
+constexpr int IE_ADDRESS = 0xFFFF;
+constexpr int IF_ADDRESS = 0xFF0F;
+
+namespace bitpos
+{
+static constexpr int VBLANK = 0;
+static constexpr int LCD = 1;
+static constexpr int TIMER = 2;
+static constexpr int SERIAL = 3;
+static constexpr int JOYPAD = 4;
+} // namespace bitpos
+
+namespace vectorAddress
+{
+static constexpr std::uint16_t VBLANK = 0x40;
+static constexpr std::uint16_t LCD = 0x48;
+static constexpr std::uint16_t TIMER = 0x50;
+static constexpr std::uint16_t SERIAL = 0x58;
+static constexpr std::uint16_t JOYPAD = 0x60;
+} // namespace vectorAddress
+
+} // namespace interrupts
+
 class CPU
 {
   MMU& mmu;
@@ -53,6 +78,7 @@ class CPU
     };
     std::uint16_t SP;
     std::uint16_t PC;
+
     bool IME;
 
     void SetFlag(int bit, bool value);
@@ -75,8 +101,28 @@ class CPU
 
   } registers;
 
+  void SanitizeFlags();
+
+  bool IsInterruptEnabled(int interruptBitpos);
+  void EnableInterrupt(int interruptBitpos);
+  void DisableInterrupt(int interruptBitpos);
+
+  bool IsInterruptPending(int interruptBitpos);
+  void RequestInterrupt(int interruptBitpos);
+  void ResetInterrupt(int interruptBitpos);
+
+  std::uint8_t GetIF();
+  std::uint8_t GetIE();
+  void SetIF(const std::uint8_t value);
+  void SetIE(const std::uint8_t value);
+
+  void HandleIMESetting();
+  void HandleInterrupts();
+
   bool halted = false;
   bool jumped = false;
+
+  bool setIMEAfterNextInstruction = false;
 
   void ExecuteOpcode(std::uint8_t opcode);
   void ExecuteExtendedOpcode(std::uint8_t opcode);
@@ -99,7 +145,7 @@ class CPU
   void OR_A_R8(const std::uint8_t& reg);
   void CP_A_R8(const std::uint8_t& reg);
 
-  void RST_VEC(const std::uint16_t);
+  void RST_VEC(const std::uint16_t addr);
 
   void RL_R8(std::uint8_t& reg);
   void RR_R8(std::uint8_t& reg);
@@ -1212,6 +1258,7 @@ class CPU
        {&CPU::SET_7_A, 2, {8}}}};
 
   void PrintCPUState();
+  void PrintBLARGGSerial();
 
 public:
   CPU(MMU& mmu) : mmu(mmu)
@@ -1226,6 +1273,7 @@ public:
     registers.L = 0x4D;
     registers.SP = 0xFFFE;
     registers.PC = 0x100;
+    registers.IME = false;
   }
   void Tick();
 
